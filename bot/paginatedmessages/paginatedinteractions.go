@@ -38,6 +38,7 @@ func handlePageChange(ic *discordgo.InteractionCreate, pageMod int) {
 	}
 
 	menusLock.Lock()
+	logger.Println("Fetching pm from map with id: ", ic.Message.ID)
 	if paginatedMessage, ok := activePaginatedMessagesMap[ic.Message.ID]; ok {
 		logger.Println("paginated message found")
 		menusLock.Unlock()
@@ -84,6 +85,7 @@ func createNavigationButtons(prevDisabled bool, nextDisabled bool) []discordgo.M
 }
 
 func CreatePaginatedMessage(guildID, channelID int64, initPage, maxPages int, pagerFunc PagerFunc) (*PaginatedMessage, error) {
+	logger.Println("Creating paginated message")
 	if initPage < 1 {
 		initPage = 1
 	}
@@ -113,11 +115,13 @@ func CreatePaginatedMessage(guildID, channelID int64, initPage, maxPages int, pa
 		Text: footer,
 	}
 	embed.Timestamp = time.Now().Format(time.RFC3339)
+	logger.Println("Sending the message to channel: ", channelID)
 
 	msg, err := common.BotSession.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
 		Embeds:     []*discordgo.MessageEmbed{embed},
 		Components: createNavigationButtons(true, nextButtonDisabled),
 	})
+	logger.Println("message sent with id: ", msg.ID, "\tand err? ", err)
 	if err != nil {
 		return nil, err
 	}
@@ -127,6 +131,8 @@ func CreatePaginatedMessage(guildID, channelID int64, initPage, maxPages int, pa
 
 	menusLock.Lock()
 	activePaginatedMessagesMap[pm.MessageID] = pm
+	_, ok := activePaginatedMessagesMap[msg.ID]
+	logger.Println("Added to map? ", ok)
 	menusLock.Unlock()
 
 	go pm.paginationTicker()
