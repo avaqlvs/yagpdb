@@ -18,6 +18,7 @@ var (
 
 func handleInteractionCreate(evt *eventsystem.EventData) {
 	ic := evt.InteractionCreate()
+	logger.Println("hanlding the interaction event with type: ", ic.Type)
 	if ic.Type != discordgo.InteractionMessageComponent {
 		return
 	}
@@ -30,16 +31,20 @@ func handleInteractionCreate(evt *eventsystem.EventData) {
 }
 
 func handlePageChange(ic *discordgo.InteractionCreate, pageMod int) {
+	logger.Println("in function handlePageChange with pageMod: ", pageMod)
 	if (ic.Member != nil && ic.Member.User.ID == common.BotUser.ID) || (ic.User != nil && ic.User.ID == common.BotUser.ID) {
+		logger.Println("Returning because bot")
 		return
 	}
 
 	menusLock.Lock()
 	if paginatedMessage, ok := activePaginatedMessagesMap[ic.Message.ID]; ok {
+		logger.Println("paginated message found")
 		menusLock.Unlock()
 		paginatedMessage.HandlePageButtonClick(ic, pageMod)
 		return
 	}
+	logger.Println("paginated message not found in map!")
 	menusLock.Unlock()
 }
 
@@ -133,9 +138,11 @@ func (p *PaginatedMessage) HandlePageButtonClick(ic *discordgo.InteractionCreate
 	defer p.mu.Unlock()
 
 	// Pong the interaction
+	logger.Println("inside HandlePageButtonClick")
 	err := common.BotSession.CreateInteractionResponse(ic.ID, ic.Token, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseDeferredMessageUpdate,
 	})
+	logger.Println("interaction acknowledged with err: ", err)
 	if err != nil {
 		return
 	}
@@ -144,6 +151,7 @@ func (p *PaginatedMessage) HandlePageButtonClick(ic *discordgo.InteractionCreate
 		(p.MaxPage > 0 && pageMod == 1 && p.CurrentPage+pageMod > p.MaxPage) {
 		return
 	}
+	logger.Println("navigating to new page")
 
 	newPage := p.CurrentPage + pageMod
 	newMsg, err := p.Navigate(p, newPage)
@@ -184,6 +192,7 @@ func (p *PaginatedMessage) HandlePageButtonClick(ic *discordgo.InteractionCreate
 		Text: footer,
 	}
 	newMsg.Timestamp = time.Now().Format(time.RFC3339)
+	logger.Println("Sending the new message")
 
 	_, err = common.BotSession.ChannelMessageEditComplex(&discordgo.MessageEdit{
 		Embeds:     []*discordgo.MessageEmbed{newMsg},
@@ -191,6 +200,7 @@ func (p *PaginatedMessage) HandlePageButtonClick(ic *discordgo.InteractionCreate
 		Channel:    ic.ChannelID,
 		ID:         ic.Message.ID,
 	})
+	logger.Println("Any error? ", err)
 
 	if err != nil {
 		switch code, _ := common.DiscordError(err); code {
